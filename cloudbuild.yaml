@@ -1,0 +1,22 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        DOCKER_BUILDKIT=1 docker build \
+          --secret id=github_pat,env=GITHUB_PAT \
+          -t us-central1-docker.pkg.dev/n70-appscript/cloud-run-source-deploy/n70-persistence-gateway:latest \
+          .
+    secretEnv: ['GITHUB_PAT']
+
+images:
+  - 'us-central1-docker.pkg.dev/n70-appscript/cloud-run-source-deploy/n70-persistence-gateway:latest'
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/n70-appscript/secrets/GITHUB_PAT/versions/latest
+      env: 'GITHUB_PAT'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
