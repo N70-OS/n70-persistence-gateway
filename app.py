@@ -13,6 +13,10 @@ Phase 3.0 changes (Tenant Isolation):
      engagementId, fields: tenantId, status). A caller-supplied tenantId is
      rejected, so a caller can never name a tenant directly.
   2. Unregistered or non-active engagements are refused (fail closed).
+     Exception: an UNREGISTERED engagementId that starts with TEST_ resolves to
+     the shared test tenant, so test-mode deals (TEST_DEAL_<timestamp>) work
+     without registration. A registered entry always wins, and an unregistered
+     TEST_ id can only ever reach the test tenant.
   3. Every call writes one audit line (JSON, no document content) that
      carries engagementId and tenantId.
   4. Responses are JSON-safe and match what the GAS wrappers expect:
@@ -50,6 +54,10 @@ TENANT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{2,18}$")
 # dealIds are HubSpot Company IDs (digits) or TEST_DEAL_<timestamp>.
 ENGAGEMENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,200}$")
 
+# Unregistered TEST_ engagements resolve here (and only here).
+TEST_ENGAGEMENT_PREFIX = "TEST_"
+TEST_TENANT_ID = "test-tenant-1"
+
 _control_client = None
 _registry_cache = {}  # engagementId -> (tenantId, expiry epoch seconds)
 
@@ -83,6 +91,9 @@ def resolve_tenant(engagement_id):
         raise RegistryError("registry unavailable", 503)
 
     if not snap.exists:
+        if engagement_id.startswith(TEST_ENGAGEMENT_PREFIX):
+            _registry_cache[engagement_id] = (TEST_TENANT_ID, now + CACHE_TTL_SECONDS)
+            return TEST_TENANT_ID
         raise RegistryError("engagement not registered or not active", 403)
 
     data = snap.to_dict() or {}
